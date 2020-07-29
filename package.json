@@ -1,0 +1,16 @@
+{
+	"name": "flappy-bird",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"deploy": "gh-pages -d dist"
+	},
+	"keywords": [],
+	"author": "Bam McGuinness",
+	"license": "ISC",
+	"homepage": "https://kablammo17.github.io/flappy-bird",
+	"dependencies": {
+		"gh-pages": "^3.1.0"
+	}
+}
