@@ -1,82 +1,314 @@
+// check that there is no profanity in usernames
+const profanityBaseURL = "https://www.purgomalum.com/service/plain?text=";
+
+// Randomly assigned temporary username array
+const nickNamesDictionary = [
+	"pink crow",
+	"green pigeon",
+	"brown robin",
+	"blue woodpecker",
+	"purple sparrow",
+	"yellow kingfisher",
+	"gray warbler",
+	"orange bulbul",
+	"black drongo",
+	"red seagulls",
+	"beige flamingo",
+	"frost eagles",
+	"fuscia owl",
+	"mint kite",
+	"hickory parakeet",
+	"tortilla beeeater",
+	"wood munia",
+	"violet dove",
+	"eggplant peacock",
+	"golden oriole",
+	"magenta flycatcher",
+	"mulberry quail",
+	"slate magpie",
+	"navy roller",
+	"azure emu",
+	"arctic sunbird",
+	"iris starling",
+	"olive rockthrush",
+	"pecan barnowl",
+	"carob goose",
+	"coal duck",
+	"grease trogon",
+	"raven nightjar",
+	"sepia barbet",
+];
+
+// game detail variables
+let obstacleTimers = [];
+let gameStarted = false;
+let gameTimerId;
+let myScore = 0;
+let highScore = 0;
+let highScoreNickName = "sad panda";
+let myNickName;
+let myClientId;
+let myPublishChannel;
+let gameChannel;
+let gameChannelName = "flapping-bird-game";
+let allBirds = {};
+let topScoreChannel;
+let topScoreChannelName = "flapping-good-scores";
+
+// Check Local Storage and assign random NickName if empty
+if (localStorage.getItem("flappy-nickname")) {
+	myNickName = localStorage.getItem("flappy-nickname");
+} else {
+	myNickName = nickNamesDictionary[Math.floor(Math.random() * 34)];
+	localStorage.setItem("flappy-nickname", myNickName);
+}
+
+const realtime = new Ably.Realtime({
+	authUrl: "/auth",
+});
+
 // Event Listener
-document.addEventListener('DOMContentLoaded', () => {
-  const bird = document.querySelector('.bird');
-  const gameDisplay = document.querySelector('.game-container');
-  const ground = document.querySelector('.ground');
+document.addEventListener("DOMContentLoaded", () => {
+	const sky = document.querySelector(".sky");
+	const bird = document.querySelector(".bird");
+	const gameDisplay = document.querySelector(".game-container");
+	const ground = document.querySelector(".ground-moving");
 
-  let birdLeft = 220;
-  let birdBottom = 100;
-  let gravity = 2;
-  let isGameOver = false;
-  let gap = 430;
+	let nickNameInput = document.getElementById("nickname-input");
+	let updateNickNameBtn = document.getElementById("update-nickname");
+	let scoreLabel = document.getElementById("score-label");
+	let topScoreLabel = document.getElementById("top-label");
+	let scoreList = document.getElementById("score-list");
 
-  function startGame() {
-    birdBottom -= gravity;
-    bird.style.bottom = birdBottom + 'px';
-    bird.style.left = birdLeft + 'px';
-  }
+	let birdLeft = 220;
+	let birdBottom = 350;
+	let gravity = 2;
+	let isGameOver = false;
+	let gap = 450;
 
-  let gameTimerId = setInterval(startGame, 20);
+	const filterNickName = async (nickNameText) => {
+		const http = new XMLHttpRequest();
+		let encodeText = encodeURIComponent(nickNameText);
+		http.open("GET", profanityBaseURL + encodeText + "&fill_text=---");
+		http.send();
+		http.onload = () => {
+			myNickName = http.responseText;
+			nickNameInput.value = myNickName;
+			localStorage.setItem("flappy-nickname", myNickName);
+		};
+	};
 
-  function control(e) {
-    if (e.keyCode === 32) {
-      jump();
-    }
-  }
+	topScoreLabel.innerHTML = `top score - ${highScore}pts by ${highScoreNickName}`;
+	nickNameInput.value = myNickName;
+	updateNickNameBtn.addEventListener("click", () => {
+		filterNickName(nickNameInput.value);
+	});
 
-  function jump() {
-    if (birdBottom < 500) {
-      birdBottom += 50;
-    }
-    bird.style.bottom = birdBottom + 'px';
-    console.log(birdBottom);
-  }
-  document.addEventListener('keyup', control);
+	window.addEventListener("keydown", function (e) {
+		if (e.keyCode === 32 && e.target === document.body) {
+			e.preventDefault();
+		}
+	});
 
-  function generateObstacle() {
-    let obstacleLeft = 500;
-    let randomHeight = Math.random() * 60;
-    let obstacleBottom = randomHeight;
-    const obstacle = document.createElement('div');
-    const topObstacle = document.createElement('div');
-    if (!isGameOver) {
-      obstacle.classList.add('obstacle');
-      topObstacle.classList.add('topObstacle');
-    }
-    gameDisplay.appendChild(obstacle);
-    gameDisplay.appendChild(topObstacle);
-    obstacle.style.left = obstacleLeft + 'px';
-    topObstacle.style.left = obstacleLeft + 'px';
-    obstacle.style.bottom = obstacleBottom + 'px';
-    topObstacle.style.bottom = obstacleBottom + gap + 'px';
+	realtime.connection.once("connected", () => {
+		myClientId = realtime.auth.clientId;
+		myPublishChannel = realtime.channels.get(`bird-position-${myClientId}`);
+		topScoreChannel = realtime.channels.get(topScoreChannelName, {
+			params: {
+				rewind: 1,
+			},
+		});
 
-    function moveObstacle() {
-      obstacleLeft -= 2;
-      obstacle.style.left = obstacleLeft + 'px';
-      topObstacle.style.left = obstacleLeft + 'px';
+		topScoreChannel.subscribe((msg) => {
+			highScore = msg.data.score;
+			highScoreNickName = msg.data.nickname;
+			topScoreLabel.innerHTML = `top score - ${highScore}pts by ${highScoreNickName}`;
+			topScoreChannel.unsubscribe();
+		});
 
-      if (obstacleLeft === -60) {
-        clearInterval(timerId);
-        gameDisplay.removeChild(obstacle);
-        gameDisplay.removeChild(topObstacle);
-      }
+		gameChannel = realtime.channels.get(gameChannelName);
 
-      if (obstacleLeft > 200 && obstacleLeft < 280 && birdLeft === 220 && (birdBottom < obstacleBottom + 153 || birdBottom > obstacleBottom + gap - 200) || birdBottom === 0) {
-        gameOver();
-        clearInterval(timerId);
-      }
-    }
-    let timerId = setInterval(moveObstacle, 20);
+		gameDisplay.onclick = function () {
+			if (!gameStarted) {
+				gameStarted = true;
+				gameChannel.presence.enter({
+					nickname: myNickName,
+				});
+				sendPositionUpdates();
+				showOtherBirds();
+				document.addEventListener("keydown", control);
+				gameTimerId = setInterval(startGame, 20);
+			}
+		};
+	});
 
-    if (!isGameOver) {
-      setTimeout(generateObstacle, 3100);
-    }
-  }
-  generateObstacle();
+	function startGame() {
+		birdBottom -= gravity;
+		bird.style.bottom = `${birdBottom}px`;
+		bird.style.left = `${birdLeft}px`;
+		for (item in allBirds) {
+			if (allBirds[item].targetBottom) {
+				let tempBottom = parseInt(allBirds[item].el.style.bottom);
+				tempBottom += (allBirds[item].targetBottom - tempBottom) * 0.5;
+				allBirds[item].el.style.bottom = `${tempBottom}px`;
+			}
+		}
+	}
 
-  function gameOver() {
-    clearInterval(gameTimerId);
-    isGameOver = true;
-    document.removeEventListener('keyup', control);
-  }
-})
+	function control(e) {
+		if (e.keyCode === 32) {
+			jump();
+		}
+	}
+
+	function jump() {
+		if (birdBottom < 500) {
+			birdBottom += 50;
+		}
+		bird.style.bottom = `${birdBottom}px`;
+		console.log(birdBottom);
+	}
+
+	function generateObstacles(randomHeight) {
+		if (!isGameOver) {
+			let obstacleLeft = 500;
+			let obstacleBottom = randomHeight; //Math.random() * 60;
+
+			const obstacle = document.createElement("div");
+			const topObstacle = document.createElement("div");
+			obstacle.classList.add("obstacle");
+			topObstacle.classList.add("topObstacle");
+			gameDisplay.appendChild(obstacle);
+			gameDisplay.appendChild(topObstacle);
+			obstacle.style.left = `${obstacleLeft}px`;
+			topObstacle.style.left = `${obstacleLeft}px`;
+			obstacle.style.bottom = `${obstacleBottom}px`;
+			topObstacle.style.bottom = `${obstacleBottom + gap}px`;
+			let timerId = setInterval(moveObstacle, 20);
+			obstacleTimers.push(timerId);
+
+			function moveObstacle() {
+				obstacleLeft -= 2;
+				obstacle.style.left = `${obstacleLeft}px`;
+				topObstacle.style.left = `${obstacleLeft}px`;
+
+				if (obstacleLeft === 220) {
+					myScore++;
+					setTimeout(() => {
+						sortLeaderBoard();
+					}, 400);
+				}
+
+				if (obstacleLeft === -60) {
+					clearInterval(timerId);
+					gameDisplay.removeChild(obstacle);
+					gameDisplay.removeChild(topObstacle);
+				}
+
+				if (
+					(obstacleLeft > 200 &&
+						obstacleLeft < 280 &&
+						birdLeft === 220 &&
+						(birdBottom < obstacleBottom + 210 ||
+							birdBottom > obstacleBottom + gap - 150)) ||
+					birdBottom === 0
+				) {
+					sortLeaderBoard();
+					gameOver();
+					isGameOver = true;
+				}
+			}
+		}
+	}
+
+	function gameOver() {
+		scoreLabel.innerHTML += " | Game Over";
+		clearInterval(gameTimerId);
+		isGameOver = true;
+		document.removeEventListener("keydown", control);
+		ground.classList.add("ground");
+		ground.classList.remove("ground-moving");
+		gameChannel.presence.leave();
+		gameChannel.detach();
+		realtime.connection.close();
+	}
+
+	function sendPositionUpdates() {
+		let publishTimer = setInterval(() => {
+			myPublishChannel.publish("pos", {
+				bottom: parseInt(bird.style.bottom),
+				nickname: myNickName,
+				score: myScore,
+			});
+			if (isGameOver) {
+				clearInterval(publishTimer);
+				myPublishChannel.detach();
+			}
+		}, 100);
+	}
+
+	function showOtherBirds() {
+		gameChannel.subscribe("game-state", (msg) => {
+			for (let item in msg.data.birds) {
+				if (item != myClientId) {
+					let newBottom = msg.data.birds[item].bottom;
+					let newLeft = msg.data.birds[item].left;
+					let isDead = msg.data.birds[item].isDead;
+					if (allBirds[item] && !isDead) {
+						allBirds[item].targetBottom = newBottom;
+						allBirds[item].left = newLeft;
+						allBirds[item].isDead = msg.data.birds[item].isDead;
+						allBirds[item].nickname = msg.data.birds[item].nickname;
+						allBirds[item].score = msg.data.birds[item].score;
+					} else if (allBirds[item] && isDead) {
+						sky.removeChild(allBirds[item].el);
+						delete allBirds[item];
+					} else {
+						if (!isGameOver) {
+							allBirds[item] = {};
+							allBirds[item].el = document.createElement("div");
+							allBirds[item].el.classList.add("other-bird");
+							sky.appendChild(allBirds[item].el);
+							allBirds[item].el.style.bottom = `${newBottom}px`;
+							allBirds[item].el.style.left = `${newLeft}px`
+							allBirds[item].isDead = msg.data.birds[item].isDead;
+							allBirds[item].nickname = msg.data.birds[item].nickname;
+							allBirds[item].score = msg.data.birds[item].score;
+						}
+					}
+				} else if (item == myClientId) {
+					allBirds[item] = msg.data.birds[item];
+				}
+			}
+			if (msg.data.highScore > highScore) {
+				highScore = msg.data.highScore;
+				highScoreNickName = msg.data.highScoreNickName;
+				topScoreLabel.innerHTML = `top score - ${highScore}pts by ${highScoreNickName}`;
+			}
+			if (msg.data.launchObstacle === true && !isGameOver) {
+				generateObstacles(msg.data.obstacleHeight);
+			}
+		});
+	}
+
+	function sortLeaderBoard() {
+		scoreLabel.innerHTML = `Score: ${myScore}`;
+		let listItems = "";
+		let leaderBoard = new Array();
+		for (let item in allBirds) {
+			leaderBoard.push({
+				nickname: allBirds[item].nickname,
+				score: allBirds[item].score,
+			});
+		}
+		leaderBoard.sort((a, b) => {
+			b.score - a.score;
+		});
+		leaderBoard.forEach((bird) => {
+			console.log("here");
+			listItems +=
+				`<li class="score-item"><span class="name">${bird.nickname}</span><span class="points">${bird.score}pts</span></li>`;
+		});
+		scoreList.innerHTML = listItems;
+	}
+});

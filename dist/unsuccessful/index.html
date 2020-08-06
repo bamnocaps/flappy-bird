@@ -3,39 +3,38 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>flappy bird multiplayer</title>
-  <link rel="icon" href="favicon.ico" type="image/x-icon">
+  <title>flapping bird multiplayer</title>
+  <link rel="icon" href="../img/favicon.ico" type="image/x-icon">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
-  </link>
   <script src="https://cdn.ably.io/lib/vcdiff-decoder.min-1.js"></script>
   <script lang="text/javascript" src="https://cdn.ably.io/lib/ably.min-1.js"></script>
-  <script src="js/script.js" charset="utf-8"></script>
+  <script src="js/script.js"></script>
 </head>
 
 <body>
 
   <div class="border-left"></div>
   <div class="game-container">
-    <div class="borderTop"></div>
+    <div class="border-top"></div>
     <div class="sky">
       <div class="bird"></div>
     </div>
   </div>
-  <div class="player-profile">
-    <h1 class="title">flappy bird multiplayer</h1>
-    <p class="instruction">click on the game area to start, use space bar to jump</p>
+  <div class="player-panel">
+    <h1 class="title">flapping bird multiplayer</h1>
+    <p class="instruction">click game area to start. use spacebar to flap</p>
     <div class="my-info">
       <div class="nickname">
         <input id="nickname-input" maxlength="18"></input>
-        <button id="update-nickname">new nickname</button>
+        <button id="update-nickname">update nickname</button>
       </div>
       <div class="my-score">
-        <p id="score-label">score: 0</p>
+        <p id="score-label">Score: 0</p>
       </div>
     </div>
     <div class="scoreboard">
-      <h2 class="score-title">live leaderboard</h2>
+      <h2 class="score-title">Live Leaderboard</h2>
       <div class="top-score">
         <p id="top-label"></p>
       </div>
